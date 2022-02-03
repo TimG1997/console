@@ -379,7 +379,6 @@ const ContainerDetails: React.FC<ContainerDetailsProps> = (props) => {
 ContainerDetails.displayName = 'ContainerDetails';
 
 export const ContainersDetailsPage: React.FC<ContainerDetailsPageProps> = (props) => {
-  const { t } = useTranslation();
   return (
     <div>
       <Firehose
@@ -393,26 +392,38 @@ export const ContainersDetailsPage: React.FC<ContainerDetailsPageProps> = (props
           },
         ]}
       >
-        <PageHeading
-          detail={true}
-          title={props.match.params.name}
-          kind="Container"
-          breadcrumbsFor={() => [
-            { name: t('public~Pods'), path: getBreadcrumbPath(props.match, 'pods') },
-            {
-              name: props.match.params.podName,
-              path: resourcePath('Pod', props.match.params.podName, props.match.params.ns),
-            },
-            { name: t('public~Container details'), path: props.match.url },
-          ]}
-        />
-        <HorizontalNav
-          hideNav={true}
-          pages={[{ name: 'container', href: '', component: ContainerDetails }]}
-          match={props.match}
-        />
+        //TODO: infinite loading
+        <ContainersDetailsPage_ {...props} />
       </Firehose>
     </div>
+  );
+};
+
+const ContainersDetailsPage_: React.FC<ContainerDetailsPageProps> = (props) => {
+  const { t } = useTranslation();
+  //TODO: getContainerStatus(...) from props.obj
+  return (
+    <>
+      <PageHeading
+        detail={true}
+        title={props.match.params.name}
+        kind="Container"
+        getResourceStatus={() => 'Warning'}
+        breadcrumbsFor={() => [
+          { name: t('public~Pods'), path: getBreadcrumbPath(props.match, 'pods') },
+          {
+            name: props.match.params.podName,
+            path: resourcePath('Pod', props.match.params.podName, props.match.params.ns),
+          },
+          { name: t('public~Container details'), path: props.match.url },
+        ]}
+      />
+      <HorizontalNav
+        hideNav={true}
+        pages={[{ name: 'container', href: '', component: ContainerDetails }]}
+        match={props.match}
+      />
+    </>
   );
 };
 
@@ -446,4 +457,5 @@ type ContainerDetailsProps = {
 
 type ContainerDetailsPageProps = {
   match: any;
+  obj?: PodKind;
 };
