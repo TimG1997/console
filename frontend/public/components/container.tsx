@@ -226,12 +226,18 @@ const getImageNameAndTag = (image: string) => {
   return { imageName, imageTag };
 };
 
+const getContainer = (pod: any, name: any) => {
+  return (
+    (_.find(pod.spec.containers, { name }) as ContainerSpec) ||
+    (_.find(pod.spec.initContainers, { name }) as ContainerSpec)
+  );
+};
+
 const ContainerDetails: React.FC<ContainerDetailsProps> = (props) => {
   const { t } = useTranslation();
   const pod = props.obj;
-  const container =
-    (_.find(pod.spec.containers, { name: props.match.params.name }) as ContainerSpec) ||
-    (_.find(pod.spec.initContainers, { name: props.match.params.name }) as ContainerSpec);
+  const container = getContainer(pod, props.match.params.name);
+
   if (!container) {
     return null;
   }
@@ -392,7 +398,6 @@ export const ContainersDetailsPage: React.FC<ContainerDetailsPageProps> = (props
           },
         ]}
       >
-        //TODO: infinite loading
         <ContainersDetailsPage_ {...props} />
       </Firehose>
     </div>
@@ -401,14 +406,28 @@ export const ContainersDetailsPage: React.FC<ContainerDetailsPageProps> = (props
 
 const ContainersDetailsPage_: React.FC<ContainerDetailsPageProps> = (props) => {
   const { t } = useTranslation();
-  //TODO: getContainerStatus(...) from props.obj
+  const pod = props.obj.data;
+  const container =
+    (_.find(pod.spec.containers, { name: props.match.params.name }) as ContainerSpec) ||
+    (_.find(pod.spec.initContainers, { name: props.match.params.name }) as ContainerSpec);
+  if (!container) {
+    return null;
+  }
+
+  const status: ContainerStatus =
+    getContainerStatus(pod, container.name) || ({} as ContainerStatus);
+  const state = getContainerState(status);
+  const stateValue =
+    state.value === 'terminated' && _.isFinite(state.exitCode)
+      ? t('public~{{label}} with exit code {{exitCode}}', { state })
+      : state.label;
   return (
     <>
       <PageHeading
         detail={true}
         title={props.match.params.name}
         kind="Container"
-        getResourceStatus={() => 'Warning'}
+        getResourceStatus={() => stateValue}
         breadcrumbsFor={() => [
           { name: t('public~Pods'), path: getBreadcrumbPath(props.match, 'pods') },
           {
@@ -417,11 +436,13 @@ const ContainersDetailsPage_: React.FC<ContainerDetailsPageProps> = (props) => {
           },
           { name: t('public~Container details'), path: props.match.url },
         ]}
+        {...props}
       />
       <HorizontalNav
         hideNav={true}
         pages={[{ name: 'container', href: '', component: ContainerDetails }]}
         match={props.match}
+        {...props}
       />
     </>
   );
@@ -457,5 +478,5 @@ type ContainerDetailsProps = {
 
 type ContainerDetailsPageProps = {
   match: any;
-  obj?: PodKind;
+  obj?: any;
 };
