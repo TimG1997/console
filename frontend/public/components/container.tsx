@@ -19,16 +19,17 @@ import * as k8sProbe from '../module/k8s/probe';
 import { getContainerState, getContainerStatus, getPullPolicyLabel } from '../module/k8s/container';
 import {
   Firehose,
+  FirehoseResource,
   HorizontalNav,
   MsgBox,
   NodeLink,
   PageHeading,
+  resourcePath,
   ResourceLink,
   ScrollToTopOnMount,
   SectionHeading,
   Timestamp,
 } from './utils';
-import { resourcePath } from './utils/resource-link';
 import { getBreadcrumbPath } from '@console/internal/components/utils/breadcrumbs';
 
 const formatComputeResources = (resources: ResourceList) =>
@@ -227,13 +228,24 @@ const getImageNameAndTag = (image: string) => {
 };
 
 const getContainer = (pod: any, name: any) => {
+  if (!pod.spec) {
+    return null;
+  }
+
   return (
     (_.find(pod.spec.containers, { name }) as ContainerSpec) ||
     (_.find(pod.spec.initContainers, { name }) as ContainerSpec)
   );
 };
 
-const ContainerDetails: React.FC<ContainerDetailsProps> = (props) => {
+const getContainerStateValue = (state: any, t: any) => {
+  const containerTerminated = state.value === 'terminated' && _.isFinite(state.exitCode);
+  return containerTerminated
+    ? t('public~{{label}} with exit code {{exitCode}}', { state })
+    : state.label;
+};
+
+export const ContainerDetails: React.FC<ContainerDetailsProps> = (props) => {
   const { t } = useTranslation();
   const pod = props.obj;
   const container = getContainer(pod, props.match.params.name);
@@ -245,10 +257,7 @@ const ContainerDetails: React.FC<ContainerDetailsProps> = (props) => {
   const status: ContainerStatus =
     getContainerStatus(pod, container.name) || ({} as ContainerStatus);
   const state = getContainerState(status);
-  const stateValue =
-    state.value === 'terminated' && _.isFinite(state.exitCode)
-      ? t('public~{{label}} with exit code {{exitCode}}', { state })
-      : state.label;
+  const stateValue = getContainerStateValue(state, t);
   const { imageName, imageTag } = getImageNameAndTag(container.image);
 
   return (
@@ -386,30 +395,27 @@ ContainerDetails.displayName = 'ContainerDetails';
 
 export const ContainersDetailsPage: React.FC<ContainerDetailsPageProps> = (props) => {
   return (
-    <div>
-      <Firehose
-        resources={[
-          {
-            name: props.match.params.podName,
-            namespace: props.match.params.ns,
-            kind: 'Pod',
-            isList: false,
-            prop: 'obj',
-          },
-        ]}
-      >
-        <ContainersDetailsPage_ {...props} />
-      </Firehose>
-    </div>
+    <Firehose
+      resources={[
+        {
+          name: props.match.params.podName,
+          namespace: props.match.params.ns,
+          kind: 'Pod',
+          isList: false,
+          prop: 'obj',
+        } as FirehoseResource,
+      ]}
+    >
+      <ContainersDetailsPage_ {...props} />
+    </Firehose>
   );
 };
 
-const ContainersDetailsPage_: React.FC<ContainerDetailsPageProps> = (props) => {
+export const ContainersDetailsPage_: React.FC<ContainerDetailsPageProps> = (props) => {
   const { t } = useTranslation();
   const pod = props.obj.data;
-  const container =
-    (_.find(pod.spec.containers, { name: props.match.params.name }) as ContainerSpec) ||
-    (_.find(pod.spec.initContainers, { name: props.match.params.name }) as ContainerSpec);
+  const container = getContainer(pod, props.match.params.name);
+
   if (!container) {
     return null;
   }
@@ -417,10 +423,7 @@ const ContainersDetailsPage_: React.FC<ContainerDetailsPageProps> = (props) => {
   const status: ContainerStatus =
     getContainerStatus(pod, container.name) || ({} as ContainerStatus);
   const state = getContainerState(status);
-  const stateValue =
-    state.value === 'terminated' && _.isFinite(state.exitCode)
-      ? t('public~{{label}} with exit code {{exitCode}}', { state })
-      : state.label;
+  const stateValue = getContainerStateValue(state, t);
   return (
     <>
       <PageHeading
@@ -471,12 +474,12 @@ type EnvProps = {
   env: EnvVar[];
 };
 
-type ContainerDetailsProps = {
+export type ContainerDetailsProps = {
   match: any;
   obj: PodKind;
 };
 
-type ContainerDetailsPageProps = {
+export type ContainerDetailsPageProps = {
   match: any;
   obj?: any;
 };
